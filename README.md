@@ -22,6 +22,8 @@ W / ПРОБЕЛ - Выстрел. Можно стрелять сразу нес
 
 Q - Выход
 
+## Для маководов
+У вас только на стрелки, сорян
 ---
 ![Bash](https://img.shields.io/badge/Language-Bash-4EAA25?style=for-the-badge&logo=gnu-bash)
 ![Linux](https://img.shields.io/badge/OS-Linux%20%7C%20macOS-blue?style=for-the-badge&logo=linux)

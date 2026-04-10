@@ -51,9 +51,9 @@ draw_menu_text() {
     clear
     cup 2 $((FIELD_W/2 - 10)); printf "\e[1;33m=== ZUMBASH ===\e[0m"
     cup 4 5; printf "\e[1;36mУПРАВЛЕНИЕ:\e[0m"
-    cup 5 5; printf "Ф / В (A / D) - Движение пушки"
-    cup 6 5; printf "Ц / ПРОБЕЛ (W / Space) - Выстрел"
-    cup 7 5; printf "Й (Q) - Выход"
+    cup 5 5; printf "A / D / СТРЕЛКИ < > - Движение пушки"
+    cup 6 5; printf "W / ПРОБЕЛ / СТРЕЛКА ВВЕРХ - Выстрел"
+    cup 7 5; printf "Q - Выход"
     
     cup 9 5; printf "\e[1;32mВЫБЕРИТЕ СЛОЖНОСТЬ (Нажмите цифру):\e[0m"
     cup 11 10; printf "1. Легко"
@@ -71,7 +71,7 @@ handle_resize() {
     fi
 }
 
-trap cleanup SIGINT SIGTERM SIGALRM EXIT
+trap cleanup SIGINT SIGTERM SIGALRM
 trap handle_resize SIGWINCH
 
 generate_path() {
@@ -173,9 +173,9 @@ check_match3() {
 process_key() {
     case "$1" in
         q|Q|й|Й) GAME_RUNNING=0 ;;
-        a|A|ф|Ф) [[ $PLAYER_X -gt 3 ]] && ((PLAYER_X-=2)) ;;
-        d|D|в|В) [[ $PLAYER_X -lt $((FIELD_W - 3)) ]] && ((PLAYER_X+=2)) ;;
-        w|W|ц|Ц|" ")
+        a|A|ф|Ф|LEFT) [[ $PLAYER_X -gt 3 ]] && ((PLAYER_X-=2)) ;;
+        d|D|в|В|RIGHT) [[ $PLAYER_X -lt $((FIELD_W - 3)) ]] && ((PLAYER_X+=2)) ;;
+        w|W|ц|Ц|" "|UP)
             B_X+=($PLAYER_X)
             B_Y+=($((FIELD_H - 1)))
             B_C+=($NEXT_COLOR)
@@ -189,17 +189,37 @@ handle_input() {
     
     if (( ${BASH_VERSINFO[0]:-0} >= 4 )); then
         if IFS= read -rsn1 -t "$TICK_RATE" key 2>/dev/null; then
+            if [[ "$key" == $'\e' ]]; then
+                IFS= read -rsn2 -t 0.01 _junk 2>/dev/null
+                key="$key$_junk"
+            fi
             IFS= read -rsn100 -t 0.01 _junk 2>/dev/null
-            process_key "$key"
+            
+            case "$key" in
+                *$'\e[D'*) process_key "LEFT" ;;
+                *$'\e[C'*) process_key "RIGHT" ;;
+                *$'\e[A'*) process_key "UP" ;;
+                *) process_key "$key" ;;
+            esac
         fi
     else
         if read -t 0 2>/dev/null; then
             IFS= read -rsn1 key 2>/dev/null
-            process_key "$key"
+            if [[ "$key" == $'\e' ]]; then
+                IFS= read -rsn2 -t 1 _junk 2>/dev/null
+                key="$key$_junk"
+            fi
             
             while read -t 0 2>/dev/null; do
                 IFS= read -rsn1 _junk 2>/dev/null
             done
+            
+            case "$key" in
+                *$'\e[D'*) process_key "LEFT" ;;
+                *$'\e[C'*) process_key "RIGHT" ;;
+                *$'\e[A'*) process_key "UP" ;;
+                *) process_key "$key" ;;
+            esac
         fi
         sleep "$TICK_RATE"
     fi

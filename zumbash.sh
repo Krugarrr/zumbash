@@ -35,14 +35,14 @@ cup() { printf "\e[%d;%dH" "$1" "$2"; }
 
 init_engine() {
     printf "\e[?1049h\e[?25l"
-    stty -echo
+    STTY_SAVE=$(stty -g)
     clear
     generate_path
 }
 
 cleanup() {
     printf "\e[?25h\e[?1049l"
-    stty echo
+    stty "$STTY_SAVE" 2>/dev/null
     clear
     exit 0
 }
@@ -71,7 +71,7 @@ handle_resize() {
     fi
 }
 
-trap cleanup SIGINT SIGTERM SIGALRM
+trap cleanup SIGINT SIGTERM SIGALRM EXIT
 trap handle_resize SIGWINCH
 
 generate_path() {
@@ -87,12 +87,13 @@ generate_path() {
 }
 
 show_menu() {
+    stty -echo -icanon min 1 time 0
     GAME_STATE="MENU"
     draw_menu_text
 
     local choice
     while true; do
-        read -rsn1 choice
+        read -rsn1 choice 2>/dev/null
         case "$choice" in
             1) SNAKE_SPEED=12; break ;;
             2) SNAKE_SPEED=8; break ;;
@@ -108,6 +109,8 @@ show_menu() {
     OLD_PLAYER_X=-1
     B_X=(); B_Y=(); B_C=()
     GAME_STATE="PLAYING"
+    
+    stty -echo -icanon min 0 time 0
     clear
     draw_static
 }
@@ -188,7 +191,7 @@ handle_input() {
     local key="" _junk=""
     
     if (( ${BASH_VERSINFO[0]:-0} >= 4 )); then
-        if IFS= read -rsn1 -t "$TICK_RATE" key 2>/dev/null; then
+        if IFS= read -rsn1 -t 0.01 key 2>/dev/null; then
             if [[ "$key" == $'\e' ]]; then
                 IFS= read -rsn2 -t 0.01 _junk 2>/dev/null
                 key="$key$_junk"
@@ -196,33 +199,30 @@ handle_input() {
             IFS= read -rsn100 -t 0.01 _junk 2>/dev/null
             
             case "$key" in
-                *$'\e[D'*) process_key "LEFT" ;;
-                *$'\e[C'*) process_key "RIGHT" ;;
-                *$'\e[A'*) process_key "UP" ;;
+                *$'\e[D'*|*$'\eOD'*) process_key "LEFT" ;;
+                *$'\e[C'*|*$'\eOC'*) process_key "RIGHT" ;;
+                *$'\e[A'*|*$'\eOA'*) process_key "UP" ;;
                 *) process_key "$key" ;;
             esac
         fi
     else
-        if read -t 0 2>/dev/null; then
-            IFS= read -rsn1 key 2>/dev/null
+        key=$(dd bs=1 count=1 2>/dev/null)
+        if [[ -n "$key" ]]; then
             if [[ "$key" == $'\e' ]]; then
-                IFS= read -rsn2 -t 1 _junk 2>/dev/null
+                _junk=$(dd bs=2 count=1 2>/dev/null)
                 key="$key$_junk"
             fi
-            
-            while read -t 0 2>/dev/null; do
-                IFS= read -rsn1 _junk 2>/dev/null
-            done
+            while [[ -n $(dd bs=1 count=1 2>/dev/null) ]]; do : ; done
             
             case "$key" in
-                *$'\e[D'*) process_key "LEFT" ;;
-                *$'\e[C'*) process_key "RIGHT" ;;
-                *$'\e[A'*) process_key "UP" ;;
+                *$'\e[D'*|*$'\eOD'*) process_key "LEFT" ;;
+                *$'\e[C'*|*$'\eOC'*) process_key "RIGHT" ;;
+                *$'\e[A'*|*$'\eOA'*) process_key "UP" ;;
                 *) process_key "$key" ;;
             esac
         fi
-        sleep "$TICK_RATE"
     fi
+    sleep "$TICK_RATE"
 }
 
 is_path() {
@@ -352,6 +352,7 @@ draw_dynamic() {
 }
 
 show_end_screen() {
+    stty -echo -icanon min 1 time 0
     clear
     cup 8 $((FIELD_W/2 - 8))
     if [[ "$GAME_STATE" == "WIN" ]]; then printf "${C_G}*** ВЫ ПОБЕДИЛИ! ***${C_RST}"
@@ -359,7 +360,7 @@ show_end_screen() {
     fi
     cup 10 $((FIELD_W/2 - 8)); printf "Ваш счет: $SCORE"
     cup 12 $((FIELD_W/2 - 12)); printf "Нажмите любую клавишу..."
-    read -rsn1
+    read -rsn1 2>/dev/null
 }
 
 main() {
